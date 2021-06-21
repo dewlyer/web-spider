@@ -3,6 +3,9 @@ const workSheetsFromFile = require("./source").workSheetsFromFile;
 const {saveDataToJSONFile, clearDataFile} = require("./target");
 const {createPromiseListByData, createAgentPromise, getContextBySelector} = require("./query");
 
+let querySheetQueue = [];
+let finishSheetQueue = [];
+
 async function getIntroCtn(url) {
   const pres = await createAgentPromise(url);
   if (!pres || !pres.text) {
@@ -55,12 +58,6 @@ async function getMajorCtn(url) {
         throw e;
       }
     }).toArray();
-    // if (href) {
-    //   const p = await createAgentPromise(href);
-    //   if (p && p.text) {
-    //     text = getContextBySelector(pres.text, '.ch-table td:not(.ch-table-right))');
-    //   }
-    // }
     return {category, list};
   }).toArray();
 }
@@ -84,55 +81,83 @@ function getAllMajorDetails(majorCtn) {
   }
 }
 
-function getSheetQueue(data, line) {
-  const school = line[0];
-  const intro = line[5];
-  const colleges = line[6];
-  const major = line[7];
-  const result = {
-    school,
-    intro: "",
-    colleges: [],
-    major: ""
-  };
-  return Promise.allSettled([getIntroCtn(intro), getCollegesCtn(colleges), getMajorCtn(major)])
-    .then(([introCtn, collegesCtn, majorCtn]) => {
-      // console.log(introCtn);
-      // console.log(colleges);
-      // console.log(collegesCtn);
-      // console.log(major);
-      // console.log(majorCtn);
+async function finishQueueItem() {
+  const finishItem = querySheetQueue.pop();
+  finishSheetQueue.push(finishItem);
+  console.log("Finish Task Num: ", finishSheetQueue.length);
+  if (querySheetQueue.length > 0) {
+    return await getSheetQueue();
+  } else {
+    return true;
+  }
+}
+
+async function getSheetQueue() {
+  try {
+    const queueIndex = querySheetQueue.length - 1;
+    const queueCurrent = querySheetQueue[queueIndex];
+    if (!queueCurrent) {
+      return await finishQueueItem();
+    }
+    const {intro, colleges, major, result} = queueCurrent;
+    const pIntroCtn = getIntroCtn(intro);
+    const pCollegesCtn = getCollegesCtn(colleges);
+    const pMajorCtn = getMajorCtn(major);
+    const [introCtn, collegesCtn, majorCtn] =
+      await Promise.allSettled([pIntroCtn, pCollegesCtn, pMajorCtn]);
+    // console.log(introCtn);
+    // console.log(colleges);
+    // console.log(collegesCtn);
+    // console.log(major);
+    // console.log(majorCtn);
+    if (introCtn.value) {
       result.intro = introCtn.value;
+    }
+    if (collegesCtn.value) {
       result.colleges = collegesCtn.value;
+    }
+    if (majorCtn.value) {
       result.major = majorCtn.value;
-      return getAllMajorDetails(majorCtn.value);
-    })
-    .then(promiseList => {
-      promiseList.forEach(({data, categoryIndex, listIndex}) => {
-        try {
-          result.major[categoryIndex]["list"][listIndex]["text"] = data;
-        } catch (e) {
-          console.log(e)
-        }
-      });
-      saveDataToJSONFile(result);
-    })
-    .catch((error) => console.log(error))
+      const promiseList = await getAllMajorDetails(majorCtn.value);
+      if (promiseList && promiseList.length) {
+        promiseList.forEach(({data, categoryIndex, listIndex}) => {
+          try {
+            result.major[categoryIndex]["list"][listIndex]["text"] = data;
+          } catch (e) {
+            console.log(e)
+          }
+        });
+      }
+    }
+    return await finishQueueItem();
+  } catch (error) {
+    console.log(error)
+  }
 }
 
 function getSheetData() {
-  let processIndex = 0;
   clearDataFile();
   workSheetsFromFile.forEach(({data}) => {
-    data.forEach((line, index) => {
-      if (index < 1) {
-        return;
+    querySheetQueue = data.reverse().map((line) => {
+      if (line[0] === "字段") {
+        return null;
       }
-      getSheetQueue(data, line, processIndex).finally(() => {
-        processIndex++;
-        console.log(`web spider process end: index ${processIndex}`)
-      });
+      const school = line[0];
+      const intro = line[5];
+      const colleges = line[6];
+      const major = line[7];
+      const result = {
+        school,
+        intro: "",
+        colleges: [],
+        major: ""
+      };
+      return {intro, colleges, major, result};
     });
+  });
+  getSheetQueue().finally(() => {
+    const data = finishSheetQueue.map((item) => item.result);
+    saveDataToJSONFile(data);
   });
 }
 
