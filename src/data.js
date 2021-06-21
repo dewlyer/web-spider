@@ -95,17 +95,17 @@ function getSheetQueue(data, line) {
     colleges: [],
     major: ""
   };
-  return Promise.all([getIntroCtn(intro), getCollegesCtn(colleges), getMajorCtn(major)])
+  return Promise.allSettled([getIntroCtn(intro), getCollegesCtn(colleges), getMajorCtn(major)])
     .then(([introCtn, collegesCtn, majorCtn]) => {
       // console.log(introCtn);
       // console.log(colleges);
       // console.log(collegesCtn);
       // console.log(major);
       // console.log(majorCtn);
-      result.intro = introCtn;
-      result.colleges = collegesCtn;
-      result.major = majorCtn;
-      return getAllMajorDetails(majorCtn);
+      result.intro = introCtn.value;
+      result.colleges = collegesCtn.value;
+      result.major = majorCtn.value;
+      return getAllMajorDetails(majorCtn.value);
     })
     .then(promiseList => {
       promiseList.forEach(({data, categoryIndex, listIndex}) => {
