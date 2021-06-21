@@ -159,8 +159,7 @@ async function getSheetQueue(queueGroupIndex) {
 function getSheetData() {
   clearDataFile();
   workSheetsFromFile.forEach(({data}) => {
-    const queue = data.reverse()
-      .filter((line) => line[0] !== "字段")
+    const queue = data.filter((line) => line[0] !== "字段")
       .map((line) => {
         const school = line[0];
         const intro = line[5];
@@ -174,7 +173,7 @@ function getSheetData() {
         };
         return {intro, colleges, major, result};
       });
-    querySheetQueueGroup = _.chunk(queue, 45);
+    querySheetQueueGroup = _.chunk(queue, 45).map((list) => list.reverse());
     finishSheetQueueGroup = Array.from(querySheetQueueGroup, () => []);
   });
   const queueGroupPromise = querySheetQueueGroup.map((queue, index) => getSheetQueue(index));
