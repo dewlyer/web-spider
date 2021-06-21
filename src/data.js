@@ -86,9 +86,11 @@ function logFinishStatus() {
   console.clear();
   const logList = querySheetQueueGroup.map((queryQueue, index) => {
     const finishQueue = finishSheetQueueGroup[index];
-    return `\n\r 队列: ${index} -- 进度: ${finishQueue.length} / ${queryQueue.length}`;
+    const total = queryQueue.length + finishQueue.length;
+    const progress = finishQueue.length / total;
+    return `队列: ${index} -- 进度: ${progress.toFixed(2) || 0}%`;
   });
-  console.log(logList.join(" "));
+  console.log(logList.join("\n\r"));
 }
 
 async function finishQueueItem(groupIndex) {
@@ -172,7 +174,7 @@ function getSheetData() {
         };
         return {intro, colleges, major, result};
       });
-    querySheetQueueGroup = _.chunk(queue, 20);
+    querySheetQueueGroup = _.chunk(queue, 45);
     finishSheetQueueGroup = Array.from(querySheetQueueGroup, () => []);
   });
   const queueGroupPromise = querySheetQueueGroup.map((queue, index) => getSheetQueue(index));
