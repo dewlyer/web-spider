@@ -87,7 +87,7 @@ function logFinishStatus() {
   const logList = querySheetQueueGroup.map((queryQueue, index) => {
     const finishQueue = finishSheetQueueGroup[index];
     const total = queryQueue.length + finishQueue.length;
-    const progress = finishQueue.length / total;
+    const progress = finishQueue.length / total * 100;
     return `队列: ${index} -- 进度: ${progress.toFixed(2) || 0}%`;
   });
   console.log(logList.join("\n\r"));
