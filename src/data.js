@@ -17,8 +17,17 @@ async function getCollegesCtn(url) {
   if (!pres || !pres.text) {
     return "";
   }
+  const data = [];
+  const $title = getContextBySelector(pres.text, ".yxk-second-title");
   const $result = getContextBySelector(pres.text, '.yxk-detail-con');
-  return $result.html();
+  $title.each((index, item) => {
+    const $item = cheerio.load(item);
+    const $targetResult = $result.eq(index);
+    const key = $item.text();
+    const value = !$targetResult.length ? "" : $targetResult.html();
+    data.push({key, value})
+  })
+  return data;
 }
 
 async function getMajorCtn(url) {
@@ -80,7 +89,7 @@ function getSheetData() {
   clearDataFile();
   workSheetsFromFile.forEach(({data}) => {
     data.forEach((line, index) => {
-      if (index < 1) {
+      if (index > 2) {
         return;
       }
       const school = line[0];
@@ -90,7 +99,7 @@ function getSheetData() {
       const result = {
         school,
         intro: "",
-        colleges: "",
+        colleges: [],
         major: ""
       };
       Promise.all([getIntroCtn(intro), getCollegesCtn(colleges), getMajorCtn(major)])
