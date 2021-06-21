@@ -138,25 +138,24 @@ async function getSheetQueue() {
 function getSheetData() {
   clearDataFile();
   workSheetsFromFile.forEach(({data}) => {
-    querySheetQueue = data.reverse().map((line) => {
-      if (line[0] === "字段") {
-        return null;
-      }
-      const school = line[0];
-      const intro = line[5];
-      const colleges = line[6];
-      const major = line[7];
-      const result = {
-        school,
-        intro: "",
-        colleges: [],
-        major: ""
-      };
-      return {intro, colleges, major, result};
-    });
+    querySheetQueue = data.reverse()
+      .filter((line) => line[0] !== "字段")
+      .map((line) => {
+        const school = line[0];
+        const intro = line[5];
+        const colleges = line[6];
+        const major = line[7];
+        const result = {
+          school,
+          intro: "",
+          colleges: [],
+          major: ""
+        };
+        return {intro, colleges, major, result};
+      });
   });
   getSheetQueue().finally(() => {
-    const data = finishSheetQueue.map((item) => item.result);
+    const data = finishSheetQueue.map((item) => item && item.result);
     saveDataToJSONFile(data);
   });
 }
