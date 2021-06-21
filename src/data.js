@@ -84,51 +84,54 @@ function getAllMajorDetails(majorCtn) {
   }
 }
 
+function getSheetQueue(data, line) {
+  const school = line[0];
+  const intro = line[5];
+  const colleges = line[6];
+  const major = line[7];
+  const result = {
+    school,
+    intro: "",
+    colleges: [],
+    major: ""
+  };
+  return Promise.all([getIntroCtn(intro), getCollegesCtn(colleges), getMajorCtn(major)])
+    .then(([introCtn, collegesCtn, majorCtn]) => {
+      // console.log(introCtn);
+      // console.log(colleges);
+      // console.log(collegesCtn);
+      // console.log(major);
+      // console.log(majorCtn);
+      result.intro = introCtn;
+      result.colleges = collegesCtn;
+      result.major = majorCtn;
+      return getAllMajorDetails(majorCtn);
+    })
+    .then(promiseList => {
+      promiseList.forEach(({data, categoryIndex, listIndex}) => {
+        try {
+          result.major[categoryIndex]["list"][listIndex]["text"] = data;
+        } catch (e) {
+          console.log(e)
+        }
+      });
+      saveDataToJSONFile(result);
+    })
+    .catch((error) => console.log(error))
+}
+
 function getSheetData() {
   let processIndex = 0;
   clearDataFile();
   workSheetsFromFile.forEach(({data}) => {
     data.forEach((line, index) => {
-      if (index > 2) {
+      if (index < 1) {
         return;
       }
-      const school = line[0];
-      const intro = line[5];
-      const colleges = line[6];
-      const major = line[7];
-      const result = {
-        school,
-        intro: "",
-        colleges: [],
-        major: ""
-      };
-      Promise.all([getIntroCtn(intro), getCollegesCtn(colleges), getMajorCtn(major)])
-        .then(([introCtn, collegesCtn, majorCtn]) => {
-          // console.log(introCtn);
-          // console.log(colleges);
-          // console.log(collegesCtn);
-          // console.log(major);
-          // console.log(majorCtn);
-          result.intro = introCtn;
-          result.colleges = collegesCtn;
-          result.major = majorCtn;
-          return getAllMajorDetails(majorCtn);
-        })
-        .then(promiseList => {
-          promiseList.forEach(({data, categoryIndex, listIndex}) => {
-            try {
-              result.major[categoryIndex]["list"][listIndex]["text"] = data;
-            } catch (e) {
-              console.log(e)
-            }
-          })
-        })
-        .catch((error) => console.log(error))
-        .finally(() => {
-          saveDataToJSONFile(result)
-          processIndex++;
-          console.log(`web spider process end: index ${processIndex}`)
-        });
+      getSheetQueue(data, line, processIndex).finally(() => {
+        processIndex++;
+        console.log(`web spider process end: index ${processIndex}`)
+      });
     });
   });
 }
