@@ -1,10 +1,11 @@
+const _ = require('lodash');
 const cheerio = require("cheerio");
 const workSheetsFromFile = require("./source").workSheetsFromFile;
 const {saveDataToJSONFile, clearDataFile} = require("./target");
 const {createPromiseListByData, createAgentPromise, getContextBySelector} = require("./query");
 
-let querySheetQueue = [];
-let finishSheetQueue = [];
+let querySheetQueueGroup = [];
+let finishSheetQueueGroup = [];
 
 async function getIntroCtn(url) {
   const pres = await createAgentPromise(url);
@@ -81,23 +82,41 @@ function getAllMajorDetails(majorCtn) {
   }
 }
 
-async function finishQueueItem() {
+function logFinishStatus() {
+  console.clear();
+  const logList = querySheetQueueGroup.map((queryQueue, index) => {
+    const finishQueue = finishSheetQueueGroup[index];
+    return `\n\r 队列: ${index} -- 进度: ${finishQueue.length} / ${queryQueue.length}`;
+  });
+  console.log(logList.join(" "));
+}
+
+async function finishQueueItem(groupIndex) {
+  const querySheetQueue = querySheetQueueGroup[groupIndex];
+  const finishSheetQueue = finishSheetQueueGroup[groupIndex];
   const finishItem = querySheetQueue.pop();
   finishSheetQueue.push(finishItem);
-  console.log("Finish Task Num: ", finishSheetQueue.length);
+  // console.log("Group Index: ", groupIndex, "- Task Num: ", finishSheetQueue.length);
+  logFinishStatus();
   if (querySheetQueue.length > 0) {
-    return await getSheetQueue();
+    return await getSheetQueue(groupIndex);
   } else {
     return true;
   }
 }
 
-async function getSheetQueue() {
+async function getSheetQueue(queueGroupIndex) {
   try {
+    const querySheetQueue = querySheetQueueGroup[queueGroupIndex];
+    if (!querySheetQueue) {
+      console.log(1)
+      return true;
+    }
     const queueIndex = querySheetQueue.length - 1;
     const queueCurrent = querySheetQueue[queueIndex];
     if (!queueCurrent) {
-      return await finishQueueItem();
+      console.log(2)
+      return await finishQueueItem(queueGroupIndex);
     }
     const {intro, colleges, major, result} = queueCurrent;
     const pIntroCtn = getIntroCtn(intro);
@@ -129,7 +148,7 @@ async function getSheetQueue() {
         });
       }
     }
-    return await finishQueueItem();
+    return await finishQueueItem(queueGroupIndex);
   } catch (error) {
     console.log(error)
   }
@@ -138,7 +157,7 @@ async function getSheetQueue() {
 function getSheetData() {
   clearDataFile();
   workSheetsFromFile.forEach(({data}) => {
-    querySheetQueue = data.reverse()
+    const queue = data.reverse()
       .filter((line) => line[0] !== "字段")
       .map((line) => {
         const school = line[0];
@@ -153,9 +172,12 @@ function getSheetData() {
         };
         return {intro, colleges, major, result};
       });
+    querySheetQueueGroup = _.chunk(queue, 20);
+    finishSheetQueueGroup = Array.from(querySheetQueueGroup, () => []);
   });
-  getSheetQueue().finally(() => {
-    const data = finishSheetQueue.map((item) => item && item.result);
+  const queueGroupPromise = querySheetQueueGroup.map((queue, index) => getSheetQueue(index));
+  Promise.all(queueGroupPromise).finally(() => {
+    const data = _.concat.apply([], finishSheetQueueGroup).map((item) => item && item.result);
     saveDataToJSONFile(data);
   });
 }
